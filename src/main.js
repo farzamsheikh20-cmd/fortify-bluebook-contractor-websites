@@ -87,6 +87,12 @@ async function discoverListings() {
     const item = listingQueue.shift();
     if (!item?.url || seenListings.has(item.url)) continue;
     try {
+      const queuedUrl = new URL(item.url);
+      const originalUrl = new URL(item.sourceUrl);
+      if (!originalUrl.searchParams.has('searchTerm')) queuedUrl.searchParams.delete('searchTerm');
+      item.url = queuedUrl.href;
+    } catch {}
+    try {
       const navigation = await navigate(item.url);
       const links = await page.locator('a[href]').evaluateAll(elements => elements.map(a => ({ href: a.href, text: (a.innerText || '').trim(), rel: a.rel || '', ariaLabel: a.getAttribute('aria-label') || '' })));
       const html = await page.content();
@@ -99,8 +105,15 @@ async function discoverListings() {
         pending.push({ url, sourceUrl: item.sourceUrl });
         added++;
       }
-      const next = links.find(link => /^(next|next page|›|»)$/i.test(clean(link.text)) || /next/i.test(link.rel) || /next/i.test(link.ariaLabel));
-      const nextUrl = normalizeUrl(next?.href);
+      let nextUrl = null;
+      if (added > 0) {
+        const currentUrl = new URL(item.url);
+        const sourceUrl = new URL(item.sourceUrl);
+        const currentPage = Number.parseInt(currentUrl.searchParams.get('page') || '1', 10);
+        currentUrl.searchParams.set('page', String(currentPage + 1));
+        if (!sourceUrl.searchParams.has('searchTerm')) currentUrl.searchParams.delete('searchTerm');
+        nextUrl = currentUrl.href;
+      }
       if (nextUrl && !seenListings.has(nextUrl) && !listingQueue.some(queued => queued.url === nextUrl)) listingQueue.push({ url: nextUrl, sourceUrl: item.sourceUrl });
       seenListings.add(item.url);
       pages++;
