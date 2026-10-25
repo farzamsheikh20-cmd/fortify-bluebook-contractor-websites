@@ -50,24 +50,42 @@ async function save() {
 }
 if (input.resetProgress) await save();
 
-let browserProxy;
+let proxyConfiguration;
 if (input.useResidentialProxy) {
-  const proxyConfiguration = await Actor.createProxyConfiguration({ groups: ['RESIDENTIAL'], countryCode: input.proxyCountryCode || 'US' });
+  proxyConfiguration = await Actor.createProxyConfiguration({ groups: ['RESIDENTIAL'], countryCode: input.proxyCountryCode || 'US' });
   if (!proxyConfiguration) throw new Error('Residential proxy could not be created. Enable Apify Proxy access or disable useResidentialProxy.');
-  const proxyUrl = await proxyConfiguration.newUrl(`bluebook${Date.now()}`);
-  const parsed = new URL(proxyUrl);
-  browserProxy = { server: `${parsed.protocol}//${parsed.hostname}:${parsed.port}`, username: decodeURIComponent(parsed.username), password: decodeURIComponent(parsed.password) };
-  log.info('US residential proxy enabled');
 }
-const browser = await chromium.launch({
-  headless: true,
-  executablePath: process.env.APIFY_CHROME_EXECUTABLE_PATH || process.env.APIFY_DEFAULT_BROWSER_PATH || '/usr/bin/google-chrome',
-  args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-gpu'],
-  ...(browserProxy ? { proxy: browserProxy } : {})
-});
-const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', locale: 'en-US' });
-const page = await context.newPage();
-page.setDefaultTimeout(Math.min(input.pageTimeoutSecs * 1000, 30000));
+let browser;
+let context;
+let page;
+
+async function launchBrowser() {
+  let browserProxy;
+  if (proxyConfiguration) {
+    const sessionId = `bluebook${Date.now()}${Math.floor(Math.random() * 100000)}`;
+    const proxyUrl = await proxyConfiguration.newUrl(sessionId);
+    const parsed = new URL(proxyUrl);
+    browserProxy = { server: `${parsed.protocol}//${parsed.hostname}:${parsed.port}`, username: decodeURIComponent(parsed.username), password: decodeURIComponent(parsed.password) };
+  }
+  browser = await chromium.launch({
+    headless: true,
+    executablePath: process.env.APIFY_CHROME_EXECUTABLE_PATH || process.env.APIFY_DEFAULT_BROWSER_PATH || '/usr/bin/google-chrome',
+    args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-gpu'],
+    ...(browserProxy ? { proxy: browserProxy } : {})
+  });
+  context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36', locale: 'en-US' });
+  page = await context.newPage();
+  page.setDefaultTimeout(Math.min(input.pageTimeoutSecs * 1000, 30000));
+}
+
+async function rotateBrowser() {
+  await browser?.close().catch(() => {});
+  await launchBrowser();
+  log.info('Residential proxy rotated to a fresh session');
+}
+
+await launchBrowser();
+if (input.useResidentialProxy) log.info('US residential proxy enabled');
 
 async function navigate(url, targetPage = page) {
   const response = await targetPage.goto(url, { waitUntil: 'domcontentloaded', timeout: input.pageTimeoutSecs * 1000 });
@@ -120,6 +138,14 @@ async function discoverListings() {
       await save();
       log.info('Blue Book listing page discovered', { listingUrl: item.url, browserStatus: navigation.status, browserTitle: navigation.title, browserBodyLength: navigation.bodyLength, anchorsFound: links.length, profilesAdded: added, pendingProfiles: pending.length, remainingListingPages: listingQueue.length });
     } catch (error) {
+      if (/access challenge|HTTP 403/i.test(error.message) && (item.proxyRetries || 0) < 3) {
+        item.proxyRetries = (item.proxyRetries || 0) + 1;
+        listingQueue.unshift(item);
+        await save();
+        log.warning('Blue Book blocked this residential IP; rotating and retrying', { url: item.url, retry: item.proxyRetries });
+        await rotateBrowser();
+        continue;
+      }
       listingQueue.unshift(item);
       await save();
       log.error('Blue Book listing discovery stopped safely', { url: item.url, message: error.message });
@@ -169,7 +195,13 @@ try {
     visited++;
     let row;
     try { row = await extractProfile(item); }
-    catch (error) { pending.push(item); await save(); log.warning('Blue Book profile failed and remains queued', { url: item.url, message: error.message }); continue; }
+    catch (error) {
+      pending.push(item);
+      await save();
+      if (/access challenge|HTTP 403/i.test(error.message)) await rotateBrowser();
+      log.warning('Blue Book profile failed and remains queued', { url: item.url, message: error.message });
+      continue;
+    }
     seenProfiles.add(key);
     const domain = row.websiteDomain;
     if ((!domain && input.requireWebsite) || (domain && seenDomains.has(domain))) { await save(); continue; }
