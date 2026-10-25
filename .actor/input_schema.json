@@ -1,0 +1,77 @@
+{
+  "title": "Blue Book contractor websites",
+  "description": "Add Blue Book search, category, or contractor-profile URLs; collect public company websites and contacts; and prevent duplicates across runs.",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "startUrls": {
+      "title": "Blue Book search or profile URLs",
+      "description": "Paste TheBlueBook.com search/category URLs or direct iProView contractor profile URLs.",
+      "type": "array",
+      "editor": "stringList",
+      "default": ["https://www.thebluebook.com/search.html?class=2200&region=36"],
+      "items": { "type": "string" }
+    },
+    "maximumNewCompanies": {
+      "title": "Maximum new companies this run",
+      "description": "Stop after this many unique contractor websites are collected.",
+      "type": "integer", "editor": "number", "default": 100, "minimum": 1, "maximum": 10000
+    },
+    "maximumProfilesVisited": {
+      "title": "Maximum profiles visited this run",
+      "description": "Maximum contractor profiles opened in one run, including profiles without websites.",
+      "type": "integer", "editor": "number", "default": 200, "minimum": 1, "maximum": 15000
+    },
+    "maximumListingPagesThisRun": {
+      "title": "Maximum listing pages this run",
+      "description": "Maximum Blue Book search-result pages processed during one run.",
+      "type": "integer", "editor": "number", "default": 10, "minimum": 1, "maximum": 1000
+    },
+    "requireWebsite": {
+      "title": "Require external company website",
+      "description": "Output only contractor profiles containing a website outside The Blue Book.",
+      "type": "boolean", "editor": "checkbox", "default": true
+    },
+    "collectEmails": {
+      "title": "Collect public profile emails",
+      "description": "Collect email addresses publicly displayed in the Blue Book profile.",
+      "type": "boolean", "editor": "checkbox", "default": true
+    },
+    "visitCompanyWebsitesForEmails": {
+      "title": "Visit company websites for emails",
+      "description": "Open collected company homepages and collect public emails. This increases time and proxy usage.",
+      "type": "boolean", "editor": "checkbox", "default": false
+    },
+    "useResidentialProxy": {
+      "title": "Use Apify residential proxy",
+      "description": "Recommended because The Blue Book returned HTTP 403 from normal data-center connections during testing.",
+      "type": "boolean", "editor": "checkbox", "default": true
+    },
+    "proxyCountryCode": {
+      "title": "Proxy country code",
+      "description": "Two-letter residential-proxy country code. Use US for The Blue Book.",
+      "type": "string", "editor": "textfield", "default": "US"
+    },
+    "campaignName": {
+      "title": "Campaign name",
+      "description": "Keep unchanged on continuation runs to preserve queues and duplicate protection.",
+      "type": "string", "editor": "textfield", "default": "bluebook-contractors"
+    },
+    "resetProgress": {
+      "title": "Reset saved progress",
+      "description": "Erase this campaign's saved queues and duplicate history before the run.",
+      "type": "boolean", "editor": "checkbox", "default": false
+    },
+    "pageTimeoutSecs": {
+      "title": "Page navigation timeout",
+      "description": "Maximum seconds for one listing, profile, or company website.",
+      "type": "integer", "editor": "number", "default": 60, "minimum": 15, "maximum": 180
+    },
+    "delayMillis": {
+      "title": "Delay between pages",
+      "description": "Waiting time in milliseconds after each page navigation.",
+      "type": "integer", "editor": "number", "default": 1200, "minimum": 0, "maximum": 30000
+    }
+  },
+  "required": ["startUrls", "maximumNewCompanies", "maximumProfilesVisited", "maximumListingPagesThisRun", "campaignName"]
+}

@@ -1,0 +1,36 @@
+{
+  "actorSpecification": 1,
+  "fields": {
+    "companyName": { "type": "string" },
+    "website": { "type": "string" },
+    "websiteDomain": { "type": "string" },
+    "email": { "type": ["string", "null"] },
+    "allPublicEmails": { "type": "array", "items": { "type": "string" } },
+    "phone": { "type": ["string", "null"] },
+    "address": { "type": ["string", "null"] },
+    "allPhones": { "type": "array", "items": { "type": "string" } },
+    "trades": { "type": "array", "items": { "type": "string" } },
+    "blueBookProfileUrl": { "type": "string" },
+    "sourceDirectoryUrl": { "type": ["string", "null"] },
+    "collectedAt": { "type": "string" }
+  },
+  "views": {
+    "overview": {
+      "title": "Blue Book contractor websites",
+      "transformation": {
+        "fields": ["companyName", "website", "email", "phone", "address", "trades", "blueBookProfileUrl"]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "companyName": { "label": "Company", "format": "text" },
+          "website": { "label": "Website", "format": "link" },
+          "email": { "label": "Email", "format": "text" },
+          "phone": { "label": "Phone", "format": "text" },
+          "address": { "label": "Address", "format": "text" },
+          "blueBookProfileUrl": { "label": "Blue Book profile", "format": "link" }
+        }
+      }
+    }
+  }
+}
